@@ -1,0 +1,529 @@
+﻿<!DOCTYPE html>
+<!--[if IE 9]><html class="lt-ie10" lang="en"><![endif]-->
+<html class="no-js" lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <title>GitHub label manager</title>
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/foundation/5.3.1/css/normalize.min.css" />
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/foundation/5.3.1/css/foundation.min.css" />
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/4.1.0/css/font-awesome.min.css" />
+    <script src="//cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.2/modernizr.min.js"></script>
+    <style>
+        h1 .button {
+            margin-top: 10px;
+        }
+
+        #refresh {
+            margin-right: 10px;
+        }
+
+        #settings-dropdown.f-dropdown {
+            max-width: 400px;
+        }
+
+        td.nowrap {
+            white-space: nowrap;
+        }
+
+        img.avatar {
+            width: 24px;
+            height: 24px;
+            margin-right: 5px;
+        }
+
+        span.issue-label {
+            margin-right: 2px;
+        }
+
+        #labels-change {
+            list-style-type: none;
+            margin-left: 0px;
+        }
+
+            #labels-change li {
+                cursor: auto;
+            }
+
+                #labels-change li:hover {
+                    background: none;
+                }
+    </style>
+</head>
+<body>
+    <div class="row">
+        <div class="small-12 columns">
+            <h1>GitHub label manager <button class="button tiny right" title="Settings" data-options="align: left" data-dropdown="settings-dropdown"><i class="fa fa-wrench"></i></button><button id="refresh" class="button tiny right" title="Refresh"><i class="fa fa-refresh"></i></button></h1>
+
+            <div id="settings-dropdown" data-dropdown-content class="f-dropdown content">
+                <div>
+                    <span>Repository (e.g. mono/mono):</span>
+                    <input id="settings-repo-name" type="text">
+
+                    <span class="left">Personal Access Token (stored in localStorage): <a href="https://github.com/settings/tokens/new" target="_blank" title="Add a new token on GitHub (public_repo/repo scope is enough)"><i class="fa fa-plus"></i></a></span>
+                    <input id="settings-access-token" type="text">
+
+                    <button id="settings-save" class="tiny alert"><i class="fa fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="main-options" style="display:none">
+        <div class="row">
+            <div class="small-12 columns">
+                <div>
+                    <strong>Type:</strong>
+                    <input id="type-issue" name="type" type="radio" checked><label for="type-issue">issues</label>
+                    <input id="type-pr" name="type" type="radio"><label for="type-pr">pull requests</label>
+                </div>
+                <div>
+                    <strong>State:</strong>
+                    <input id="state-open" name="state" type="radio" checked><label for="state-open">open</label>
+                    <input id="state-closed" name="state" type="radio"><label for="state-closed">closed</label>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="small-12 columns">
+                <strong class="left">Labels:&nbsp;</strong>
+                <div id="labels-list">Loading...</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="small-12 columns">
+                <span><strong>Sort:</strong></span>
+                <input id="order-desc" name="order" type="radio" checked><label for="order-desc">descending</label>
+                <input id="order-asc" name="order" type="radio"><label for="order-asc">ascending</label>
+
+                <select id="sort">
+                    <option selected value="updated">Date updated</option>
+                    <option value="created">Date created</option>
+                    <option value="comments">Number of comments</option>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="small-12 columns">
+                <strong>Search:</strong><input id="search" type="text">
+            </div>
+        </div>
+    </div>
+    <br />
+    <div class="row">
+        <div class="small-12 columns">
+            <table id="main-list">
+                <thead>
+                    <tr>
+                        <th>Nr.</th>
+                        <th>User</th>
+                        <th>Title</th>
+                        <th>Created</th>
+                        <th>Updated</th>
+                        <th>Labels</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="items-list"></tbody>
+            </table>
+
+            <div id="labels-change-dropdown" data-dropdown-content class="f-dropdown content">
+                <div>
+                    <ul id="labels-change" data-number=""></ul>
+
+                    <button id="labels-change-save" class="tiny alert"><i class="fa fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/foundation/5.3.1/js/foundation.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/linq.js/2.2.0.2/jquery.linq.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.7.0/moment.min.js"></script>
+
+    <script>
+        window.repoLabels = Array();
+        $(document).foundation();
+
+        moment.lang('en', {
+            calendar: {
+                lastDay: '[Yesterday]',
+                sameDay: '[Today]',
+                nextDay: '[Tomorrow]',
+                lastWeek: '[last] dddd',
+                nextWeek: 'dddd',
+                sameElse: 'L'
+            }
+        });
+
+        $(document).ready(function () {
+            attachHandlers();
+            restoreSavedData();
+            refreshLabelsAndData();
+        });
+
+        function attachHandlers() {
+
+            $("#refresh").click(function () {
+                refreshLabelsAndData();
+            });
+
+            $("#type-pr, #type-issue").change(function () {
+                if ($("#type-pr").is(':checked')) {
+                    localStorage.setItem("options-type", "pr");
+                } else {
+                    localStorage.setItem("options-type", "issue");
+                }
+                refreshData();
+            });
+
+            $("#state-open, #state-closed").change(function () {
+                if ($("#state-open").is(':checked')) {
+                    localStorage.setItem("options-state", "open");
+                } else {
+                    localStorage.setItem("options-state", "closed");
+                }
+                refreshData();
+            });
+
+            $("#order-asc, #order-desc").change(function () {
+                if ($("#order-asc").is(':checked')) {
+                    localStorage.setItem("options-order", "asc");
+                } else {
+                    localStorage.setItem("options-order", "desc");
+                }
+                refreshData();
+            });
+
+            $("#sort").change(function () {
+                localStorage.setItem("options-sort", $("#sort option:selected").get(0).value.toString());
+                refreshData();
+            });
+
+            $("#search").keyup(function (e) {
+                if (e.keyCode == 13) {
+                    refreshData();
+                }
+            });
+
+            $("#labels-change-save").click(function () {
+                var number = $("#labels-change").attr("data-number");
+
+                if (number) {
+                    var newLabels = $.Enumerable.From($("#labels-change input:checked"))
+                        .Select(function (x) {
+                            return $(x).attr("data-lbl-new-name");
+                        }).ToArray();
+
+                    putGitHub("/repos/" + localStorage.getItem("settings-repository") + "/issues/" + number + "/labels", newLabels)
+                        .error(function () {
+                            showError("Error while applying label changes.");
+                        })
+                    .success(function () {
+                        Foundation.libs.dropdown.close($("#labels-change-dropdown"));
+                        refreshData();
+                    });
+                } else {
+                    showError("No valid issue/pr number");
+                }
+            });
+
+            $("#settings-save").click(function () {
+                var repo = $("#settings-repo-name").val();
+                var atok = $("#settings-access-token").val();
+
+                var check = $.Deferred();
+                $.getJSON("https://api.github.com/repos/" + repo)
+                    .error(function () {
+                        showError("Wrong repository name.");
+                        check.reject();
+                    })
+                    .success(function () {
+                        if (atok) {
+                            $.getJSON("https://api.github.com/user?access_token=" + atok)
+                                .error(function () {
+                                    showError("Wrong Access Token.");
+                                    check.reject();
+                                })
+                                .success(function () { check.resolve(); });
+                        } else {
+                            check.resolve();
+                        }
+                    });
+
+                check.done(function () {
+                    localStorage.setItem("settings-repository", repo);
+                    localStorage.setItem("settings-accesstoken", atok);
+                    Foundation.libs.dropdown.close($("#settings-dropdown"));
+                    refreshLabelsAndData();
+                });
+            });
+        }
+
+        function restoreSavedData() {
+            if (localStorage.getItem("settings-repository")) {
+                $("#settings-repo-name").val(localStorage.getItem("settings-repository"));
+            } else {
+                localStorage.setItem("settings-repository", "");
+            }
+
+            if (localStorage.getItem("settings-accesstoken")) {
+                $("#settings-access-token").val(localStorage.getItem("settings-accesstoken"));
+            } else {
+                localStorage.setItem("settings-accesstoken", "");
+            }
+
+            if (localStorage.getItem("options-type")) {
+                if (localStorage.getItem("options-type") === "pr") $("#type-pr").attr("checked", true);
+                else $("#type-issue").attr("checked", true);
+            } else {
+                localStorage.setItem("options-type", "issue");
+            }
+
+            if (localStorage.getItem("options-state")) {
+                if (localStorage.getItem("options-state") === "open") $("#state-open").attr("checked", true);
+                else $("#state-closed").attr("checked", true);
+            } else {
+                localStorage.setItem("options-state", "open");
+            }
+
+            if (localStorage.getItem("options-order")) {
+                if (localStorage.getItem("options-order") === "asc") $("#order-asc").attr("checked", true);
+                else $("#order-desc").attr("checked", true);
+            } else {
+                localStorage.setItem("options-order", "desc");
+            }
+
+            if (localStorage.getItem("options-sort")) {
+                $("#sort option[value='" + localStorage.getItem("options-sort") + "']").attr("selected", true);
+            } else {
+                localStorage.setItem("options-sort", "updated");
+            }
+
+            if (!localStorage.getItem("options-checkedlabels")) {
+                localStorage.setItem("options-checkedlabels", JSON.stringify([]));
+            }
+        }
+
+        function refreshLabelsAndData() {
+            if (localStorage.getItem("settings-repository")) {
+                $("#main-options").hide();
+                $("#main-list").hide();
+                fetchLabels()
+                    .success(function () {
+                        return refreshData();
+                    })
+                    .error(function () {
+                        showError("Error while fetching labels.");
+                    })
+                    .done(function () {
+                        $("#main-options").fadeIn(500);
+                        $("#main-list").fadeIn(500);
+                    });
+            }
+        }
+
+        function fetchLabels() {
+            return getGitHub("/repos/" + localStorage.getItem("settings-repository") + "/labels")
+                .success(function (data) {
+
+                    window.repoLabels = data;
+
+                    if (data.length === 0) {
+                        $("#labels-list").html("No labels found.");
+                        return;
+                    }
+
+                    $("#labels-list").html("");
+                    $.each(data, function (index, item) {
+
+                        var lbl = $("<label />").attr("for", "lbl-" + item.name).html(item.name);
+                        var chk = $("<input />").attr("id", "lbl-" + item.name).attr("type", "checkbox").attr("data-lbl-name", item.name);
+
+                        if ($.inArray(item.name, JSON.parse(localStorage.getItem("options-checkedlabels"))) >= 0) {
+                            chk.attr("checked", true);
+                        }
+
+                        chk.click(function () {
+
+                            var checkedLabels = $.Enumerable.From($("#labels-list input:checked"))
+                                .Select(function (x) {
+                                    return $(x).attr('data-lbl-name');
+                                }).ToArray();
+
+                            localStorage.setItem("options-checkedlabels", JSON.stringify(checkedLabels));
+                            refreshData();
+                        });
+
+                        $("#labels-list").append(chk);
+                        $("#labels-list").append(lbl);
+                    });
+                });
+        };
+
+        function refreshData() {
+            var queryUrl = "/search/issues?per_page=100"
+                + "&sort=" + localStorage.getItem("options-sort")
+                + "&order=" + localStorage.getItem("options-order")
+                + "&q=" + encodeURIComponent('"' + $("#search").val() + '"')
+                + "%20repo:" + localStorage.getItem("settings-repository")
+                + "%20type:" + localStorage.getItem("options-type")
+                + "%20state:" + localStorage.getItem("options-state");
+
+            var checkedLabels = $.Enumerable.From(JSON.parse(localStorage.getItem("options-checkedlabels")))
+                .Select(function (x) {
+                    if (!x) {
+                        return "";
+                    }
+                    return 'label:' + encodeURIComponent('"' + x + '"');
+                })
+                .ToString("%20");
+
+            if (checkedLabels) {
+                queryUrl += "%20" + checkedLabels;
+            }
+
+            showMessageInList("Loading...");
+            $("#main-options").find("input, select").attr("disabled", "disabled");
+
+            return getGitHub(queryUrl)
+                .always(function () {
+                    $("#main-options").find("input, select").attr("disabled", null);
+                })
+                .error(function (data) {
+
+                    if (data.getResponseHeader("X-RateLimit-Remaining") === "0") {
+                        var reset = moment.unix(data.getResponseHeader("X-RateLimit-Reset"));
+                        showMessageInList("You exceeded the rate limit of the GitHub Search API. Please try again in " + reset.diff(moment(), 'seconds') + " seconds.");
+                        return;
+                    }
+
+                    showMessageInList("An error occurred: " + data.responseJSON.message);
+                    return;
+                })
+                .success(function (data) {
+
+                    if (data.items.length === 0) {
+                        showMessageInList("No matching issues/PRs found.");
+                        return;
+                    }
+
+                    $("#items-list").html("");
+                    $.each(data.items, function (i, item) {
+
+                        var row = $("<tr/>").attr("data-pr-number", item.number);
+                        row.append($("<td/>").append($("<a />").attr("href", item.html_url).attr("target", "_blank").attr("title", "Show on GitHub").html(item.number)));
+                        row.append($("<td/>").addClass("nowrap").append($("<img />").attr("src", item.user.avatar_url + "s=24").addClass("avatar")).append($("<span/>").html(item.user.login)));
+                        row.append($("<td/>").append(item.title));
+                        row.append($("<td/>").addClass("nowrap").append(moment(item.created_at).calendar()));
+                        row.append($("<td/>").addClass("nowrap").append(moment(item.updated_at).calendar()));
+
+                        var labels = $.Enumerable.From(item.labels)
+                            .Select(function (x) {
+                                return $("<span/>").addClass("label issue-label").attr("style", "background-color: #" + x.color + "; color: #" + contrastingColor(x.color)).html(x.name);
+                            }).ToArray();
+
+                        row.append($("<td/>").append(labels));
+                        var cogCell = $("<td/>");
+                        if (localStorage.getItem("settings-accesstoken")) {
+                            cogCell.append($("<a />").addClass("right").attr("data-dropdown", "labels-change-dropdown").attr("data-options", "align: bottom").click(function () {
+                                $("#labels-change").attr("data-number", item.number);
+                                $("#labels-change").html("");
+
+                                var lbls = $.Enumerable.From(window.repoLabels)
+                                    .Select(function (x) {
+
+                                        var li = $("<li />");
+                                        var chk = $("<input />").attr("id", "lbl-new-" + x.name).attr("type", "checkbox").attr("data-lbl-new-name", x.name);
+                                        var lbl = $("<label />").attr("for", "lbl-new-" + x.name).html(x.name);
+
+                                        if ($.Enumerable.From(item.labels).Select(function (y) { return y.name }).Contains(x.name)) {
+                                            chk.attr("checked", true);
+                                        }
+
+                                        li.append(chk);
+                                        li.append(lbl);
+
+                                        return li;
+                                    })
+                                    .ToArray();
+
+                                $("#labels-change").append(lbls);
+                            }).append("<i class='fa fa-cog'></i>"));
+                        }
+                        row.append(cogCell);
+
+                        $("#items-list").append(row).hide().fadeIn(100);
+                    });
+                });
+        }
+
+        function showError(error) {
+            $("#error-modal-message").html(error);
+            $('#error-modal').foundation('reveal', 'open');
+        }
+
+        function showMessageInList(message) {
+            $("#items-list").html("<tr><td colspan='7'>" + message + "</td></tr>");
+        }
+
+        function getGitHub(url) {
+            return $.ajax({
+                url: "https://api.github.com" + url,
+                type: "GET",
+                dataType: "json",
+                beforeSend: function (req) {
+                    if (localStorage.getItem("settings-accesstoken")) {
+                        req.setRequestHeader("Authorization", "token " + localStorage.getItem("settings-accesstoken"));
+                    }
+                }
+            });
+        }
+
+        function putGitHub(url, data) {
+            return $.ajax({
+                url: "https://api.github.com" + url,
+                data: JSON.stringify(data),
+                type: "PUT",
+                dataType: "json",
+                beforeSend: function (req) {
+                    if (localStorage.getItem("settings-accesstoken")) {
+                        req.setRequestHeader("Authorization", "token " + localStorage.getItem("settings-accesstoken"));
+                    }
+                }
+            });
+        }
+
+        // Source: http://stackoverflow.com/questions/635022/calculating-contrasting-colours-in-javascript
+        function contrastingColor(color) {
+            return (luma(color) >= 165) ? '000' : 'fff';
+        }
+
+        function luma(color) // color can be a hx string or an array of RGB values 0-255
+        {
+            var rgb = (typeof color === 'string') ? hexToRGBArray(color) : color;
+            return (0.2126 * rgb[0]) + (0.7152 * rgb[1]) + (0.0722 * rgb[2]); // SMPTE C, Rec. 709 weightings
+        }
+
+        function hexToRGBArray(color) {
+            if (color.length === 3)
+                color = color.charAt(0) + color.charAt(0) + color.charAt(1) + color.charAt(1) + color.charAt(2) + color.charAt(2);
+            else if (color.length !== 6)
+                throw ('Invalid hex color: ' + color);
+            var rgb = [];
+            for (var i = 0; i <= 2; i++)
+                rgb[i] = parseInt(color.substr(i * 2, 2), 16);
+            return rgb;
+        }
+        //  -----------
+    </script>
+
+    <div id="error-modal" class="reveal-modal" data-reveal>
+        <h2>An error occurred.</h2>
+        <p id="error-modal-message" class="lead"></p>
+
+        <a class="close-reveal-modal">&#215;</a>
+    </div>
+</body>
+</html>
