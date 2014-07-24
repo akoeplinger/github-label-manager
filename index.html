@@ -328,15 +328,17 @@
             return getGitHub("/repos/" + localStorage.getItem("settings-repository") + "/labels")
                 .success(function (data) {
 
-                    window.repoLabels = data;
+                    window.repoLabels = $.Enumerable.From(data)
+                        .OrderBy(function (x) { return x.name; })
+                        .ToArray();
 
-                    if (data.length === 0) {
+                    if (window.repoLabels.length === 0) {
                         $("#labels-list").html("No labels found.");
                         return;
                     }
 
                     $("#labels-list").html("");
-                    $.each(data, function (index, item) {
+                    $.each(window.repoLabels, function (index, item) {
 
                         var lbl = $("<label />").attr("for", "lbl-" + item.name).html(item.name);
                         var chk = $("<input />").attr("id", "lbl-" + item.name).attr("type", "checkbox").attr("data-lbl-name", item.name);
