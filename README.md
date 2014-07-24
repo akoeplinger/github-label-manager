@@ -10,10 +10,12 @@ Features:
  - Uses the official GitHub API entirely from the client-side/browser.
  - Built using jQuery, Foundation, FontAwesome, Moment and jQuery.Linq.
 
+**Disclaimer:** I built this as a playground for the GitHub API and jQuery, so use at your own risk.
+
 Usage:
 ------
 
-Open https://akoeplinger.github.io/github-label-manager and click on the wrench icon on the top right.
+Open http://akoeplinger.github.io/github-label-manager and click on the wrench icon on the top right.
 Enter the repository you want to view and a personal access token from your GitHub settings.
 The token is saved in your browsers `localStorage` and doesn't get sent anywhere other than to GitHub.
 
