@@ -221,13 +221,13 @@
                         }).ToArray();
 
                     putGitHub("/repos/" + localStorage.getItem("settings-repository") + "/issues/" + number + "/labels", newLabels)
-                        .error(function () {
+                        .fail(function () {
                             showError("Error while applying label changes.");
                         })
-                    .success(function () {
-                        Foundation.libs.dropdown.close($("#labels-change-dropdown"));
-                        refreshData();
-                    });
+                        .done(function () {
+                            Foundation.libs.dropdown.close($("#labels-change-dropdown"));
+                            refreshData();
+                        });
                 } else {
                     showError("No valid issue/pr number");
                 }
@@ -239,18 +239,18 @@
 
                 var check = $.Deferred();
                 $.getJSON("https://api.github.com/repos/" + repo)
-                    .error(function () {
+                    .fail(function () {
                         showError("Wrong repository name.");
                         check.reject();
                     })
-                    .success(function () {
+                    .done(function () {
                         if (atok) {
                             $.getJSON("https://api.github.com/user?access_token=" + atok)
-                                .error(function () {
+                                .fail(function () {
                                     showError("Wrong Access Token.");
                                     check.reject();
                                 })
-                                .success(function () { check.resolve(); });
+                                .done(function () { check.resolve(); });
                         } else {
                             check.resolve();
                         }
@@ -315,22 +315,23 @@
                 $("#main-options").hide();
                 $("#main-list").hide();
                 fetchLabels()
-                    .success(function () {
-                        return refreshData();
+                    .done(function () {
+                        refreshData().always(function () {
+                            $("#main-list").fadeIn(500);
+                        });
                     })
-                    .error(function () {
+                    .fail(function () {
                         showError("Error while fetching labels.");
                     })
-                    .done(function () {
+                    .always(function () {
                         $("#main-options").fadeIn(500);
-                        $("#main-list").fadeIn(500);
                     });
             }
         }
 
         function fetchLabels() {
             return getGitHub("/repos/" + localStorage.getItem("settings-repository") + "/labels")
-                .success(function (data) {
+                .done(function (data) {
 
                     window.repoLabels = $.Enumerable.From(data)
                         .OrderBy(function (x) { return x.name; })
@@ -394,11 +395,7 @@
             $("#main-options").find("input, select").attr("disabled", "disabled");
 
             return getGitHub(queryUrl)
-                .always(function () {
-                    $(document).foundation();
-                    $("#main-options").find("input, select").attr("disabled", null);
-                })
-                .error(function (data) {
+                .fail(function (data) {
 
                     if (data.getResponseHeader("X-RateLimit-Remaining") === "0") {
                         var reset = moment.unix(data.getResponseHeader("X-RateLimit-Reset"));
@@ -409,7 +406,7 @@
                     showMessageInList("An error occurred: " + data.responseJSON.message);
                     return;
                 })
-                .success(function (data) {
+                .done(function (data) {
 
                     if (data.items.length === 0) {
                         showMessageInList("No matching issues/PRs found.");
@@ -475,8 +472,8 @@
                         $("#comments-dropdown").html("Loading...");
 
                         getGitHub("/repos/" + localStorage.getItem("settings-repository") + "/issues/" + number + "/comments", { "Accept": "application/vnd.github.v3.html+json" })
-                            .error(function () { co.html("An error occcurred."); })
-                            .success(function (comments) {
+                            .fail(function () { $("#comments-dropdown").html("An error occcurred."); })
+                            .done(function (comments) {
                                 if (comments.length > 0) {
                                     var cos = $.Enumerable.From(comments)
                                         .OrderByDescending(function (x) {
@@ -493,6 +490,10 @@
                                 }
                             });
                     });
+                })
+                .always(function () {
+                    $(document).foundation();
+                    $("#main-options").find("input, select").attr("disabled", null);
                 });
         }
 
