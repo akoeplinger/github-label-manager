@@ -395,6 +395,7 @@
 
             return getGitHub(queryUrl)
                 .always(function () {
+                    $(document).foundation();
                     $("#main-options").find("input, select").attr("disabled", null);
                 })
                 .error(function (data) {
@@ -434,7 +435,7 @@
                         row.data("labels", item.labels);
                         row.append($("<td/>").append(labels));
                         var cogCell = $("<td/>");
-                        if (localStorage.getItem("settings-accesstoken")) {
+                        if (localStorage.getItem("settings-accesstoken") && item.labels.length > 0) {
                             cogCell.append($("<a />").addClass("right cogs").attr("data-dropdown", "labels-change-dropdown").attr("data-options", "align: bottom").append("<i class='fa fa-cog'></i>"));
                         }
                         row.append(cogCell);
@@ -492,8 +493,6 @@
                                 }
                             });
                     });
-
-                    $(document).foundation();
                 });
         }
 
