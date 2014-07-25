@@ -118,6 +118,7 @@
                         <th>Nr.</th>
                         <th>User</th>
                         <th>Title</th>
+                        <th><i class="fa fa-comments"></i></th>
                         <th>Created</th>
                         <th>Updated</th>
                         <th>Labels</th>
@@ -127,12 +128,15 @@
                 <tbody id="items-list"></tbody>
             </table>
 
-            <div id="labels-change-dropdown" data-dropdown-content class="f-dropdown content">
+            <div id="labels-change-dropdown" data-dropdown-content class="f-dropdown content small">
                 <div>
                     <ul id="labels-change" data-number=""></ul>
 
                     <button id="labels-change-save" class="tiny alert"><i class="fa fa-save"></i> Save</button>
                 </div>
+            </div>
+
+            <div id="comments-dropdown" data-dropdown-content class="f-dropdown content medium">
             </div>
         </div>
     </div>
@@ -414,10 +418,11 @@
                     $("#items-list").html("");
                     $.each(data.items, function (i, item) {
 
-                        var row = $("<tr/>").attr("data-pr-number", item.number);
+                        var row = $("<tr/>").attr("data-number", item.number);
                         row.append($("<td/>").append($("<a />").attr("href", item.html_url).attr("target", "_blank").attr("title", "Show on GitHub").html(item.number)));
                         row.append($("<td/>").addClass("nowrap").append($("<img />").attr("src", item.user.avatar_url + "s=24").addClass("avatar")).append($("<span/>").html(item.user.login)));
                         row.append($("<td/>").append(item.title));
+                        row.append($("<td/>").append($("<a />").addClass("comments").append(item.comments).attr("title", "Show comments").attr("data-dropdown", "comments-dropdown").attr("data-options", "align:left")));
                         row.append($("<td/>").addClass("nowrap").append(moment(item.created_at).calendar()));
                         row.append($("<td/>").addClass("nowrap").append(moment(item.updated_at).calendar()));
 
@@ -426,38 +431,69 @@
                                 return $("<span/>").addClass("label issue-label").attr("style", "background-color: #" + x.color + "; color: #" + contrastingColor(x.color)).html(x.name);
                             }).ToArray();
 
+                        row.data("labels", item.labels);
                         row.append($("<td/>").append(labels));
                         var cogCell = $("<td/>");
                         if (localStorage.getItem("settings-accesstoken")) {
-                            cogCell.append($("<a />").addClass("right").attr("data-dropdown", "labels-change-dropdown").attr("data-options", "align: bottom").click(function () {
-                                $("#labels-change").attr("data-number", item.number);
-                                $("#labels-change").html("");
-
-                                var lbls = $.Enumerable.From(window.repoLabels)
-                                    .Select(function (x) {
-
-                                        var li = $("<li />");
-                                        var chk = $("<input />").attr("id", "lbl-new-" + x.name).attr("type", "checkbox").attr("data-lbl-new-name", x.name);
-                                        var lbl = $("<label />").attr("for", "lbl-new-" + x.name).html(x.name);
-
-                                        if ($.Enumerable.From(item.labels).Select(function (y) { return y.name }).Contains(x.name)) {
-                                            chk.attr("checked", true);
-                                        }
-
-                                        li.append(chk);
-                                        li.append(lbl);
-
-                                        return li;
-                                    })
-                                    .ToArray();
-
-                                $("#labels-change").append(lbls);
-                            }).append("<i class='fa fa-cog'></i>"));
+                            cogCell.append($("<a />").addClass("right cogs").attr("data-dropdown", "labels-change-dropdown").attr("data-options", "align: bottom").append("<i class='fa fa-cog'></i>"));
                         }
                         row.append(cogCell);
 
                         $("#items-list").append(row).hide().fadeIn(100);
                     });
+
+                    $(".cogs").click(function () {
+                        var number = $(this).closest("tr").attr("data-number");
+                        var labels = $(this).closest("tr").data("labels");
+                        $("#labels-change").attr("data-number", number);
+                        $("#labels-change").html("");
+
+                        var lbls = $.Enumerable.From(window.repoLabels)
+                            .Select(function (x) {
+
+                                var li = $("<li />");
+                                var chk = $("<input />").attr("id", "lbl-new-" + x.name).attr("type", "checkbox").attr("data-lbl-new-name", x.name);
+                                var lbl = $("<label />").attr("for", "lbl-new-" + x.name).html(x.name);
+
+                                if ($.Enumerable.From(labels).Select(function (y) { return y.name; }).Contains(x.name)) {
+                                    chk.attr("checked", true);
+                                }
+
+                                li.append(chk);
+                                li.append(lbl);
+
+                                return li;
+                            })
+                            .ToArray();
+
+                        $("#labels-change").append(lbls);
+                    });
+
+                    $(".comments").click(function () {
+                        var number = $(this).closest("tr").attr("data-number");
+                        $("#comments-dropdown").html("Loading...");
+
+                        getGitHub("/repos/" + localStorage.getItem("settings-repository") + "/issues/" + number + "/comments", { "Accept": "application/vnd.github.v3.html+json" })
+                            .error(function () { co.html("An error occcurred."); })
+                            .success(function (comments) {
+                                if (comments.length > 0) {
+                                    var cos = $.Enumerable.From(comments)
+                                        .OrderByDescending(function (x) {
+                                            return moment(x.created_at).unix();
+                                        })
+                                        .Select(function (x) {
+                                            return $("<div/>").append($("<label />").addClass("nowrap").append($("<img />").attr("src", x.user.avatar_url + "s=24").addClass("avatar")).append($("<span/>").html(x.user.login + " (" + moment(x.created_at).fromNow() + "):"))).append(x.body_html);
+                                        })
+                                        .ToArray();
+
+                                    $("#comments-dropdown").html(cos);
+                                } else {
+                                    $("#comments-dropdown").html("No comments yet.");
+                                }
+                            });
+                    });
+
+                    $(document).foundation();
                 });
         }
 
@@ -467,10 +503,10 @@
         }
 
         function showMessageInList(message) {
-            $("#items-list").html("<tr><td colspan='7'>" + message + "</td></tr>");
+            $("#items-list").html("<tr><td colspan='8'>" + message + "</td></tr>");
         }
 
-        function getGitHub(url) {
+        function getGitHub(url, customHeaders) {
             return $.ajax({
                 url: "https://api.github.com" + url,
                 type: "GET",
@@ -478,6 +514,12 @@
                 beforeSend: function (req) {
                     if (localStorage.getItem("settings-accesstoken")) {
                         req.setRequestHeader("Authorization", "token " + localStorage.getItem("settings-accesstoken"));
+                    }
+
+                    if (customHeaders) {
+                        $.each(customHeaders, function (k, v) {
+                            req.setRequestHeader(k, v);
+                        });
                     }
                 }
             });
