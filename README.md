@@ -6,7 +6,7 @@ Simple single-page application to manage labels for GitHub issues/PRs.
 Features:
 ---------
 
- - Supports labelling PRs on repositories where issues are disabled, this isn't possible with the normal GitHub UI (yet?).
+ - Supports labelling PRs on repositories where issues are disabled. ~~this isn't possible with the normal GitHub UI (yet?).~~ **GitHub now supports this natively: https://github.com/blog/1866-the-new-github-issues**
  - Uses the official GitHub API entirely from the client-side/browser.
  - Built using jQuery, Foundation, FontAwesome, Moment and jQuery.Linq.
 
